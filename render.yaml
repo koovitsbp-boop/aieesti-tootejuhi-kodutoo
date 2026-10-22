@@ -1,0 +1,16 @@
+# Render.com blueprint: New → Blueprint → vali see repo. Tasuta plaanis kustub SQLite andmebaas iga deploy'ga (demo jaoks sobib).
+services:
+  - type: web
+    name: ai-eesti-academy
+    runtime: node
+    plan: free
+    buildCommand: npm ci && node web/build.mjs
+    startCommand: node --no-warnings=ExperimentalWarning src/server.js
+    healthCheckPath: /health
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: NODE_VERSION
+        value: "22"
+      - key: ANTHROPIC_API_KEY
+        sync: false

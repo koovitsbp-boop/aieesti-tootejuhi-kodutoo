@@ -1,0 +1,26 @@
+{
+  "name": "ai-eesti-academy",
+  "version": "0.1.0",
+  "description": "AI Eesti Academy: backend, API ja MCP server (check-in otse Claude'i vestlusest)",
+  "main": "src/server.js",
+  "scripts": {
+    "build:web": "node web/build.mjs",
+    "prestart": "node web/build.mjs",
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "mcp:stdio": "node --no-warnings=ExperimentalWarning src/stdio.js",
+    "reset": "node --no-warnings=ExperimentalWarning src/reset.js",
+    "pretest": "node web/build.mjs",
+    "test": "node --no-warnings=ExperimentalWarning --test test/*.test.js"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "express": "^5.3.0",
+    "zod": "^4.6.7"
+  },
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22.5"
+  }
+}

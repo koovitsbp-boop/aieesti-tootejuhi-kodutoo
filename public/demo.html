@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Academy MCP demo</title>
+<style>
+:root{--ink:#0a0a0a;--t2:#475569;--t3:#6b7280;--line:#e5e7eb;--page:#fefefe;--acc:#7c6ad0}
+*{box-sizing:border-box;margin:0}
+body{font:15px/1.5 Inter,system-ui,-apple-system,sans-serif;color:var(--ink);background:var(--page);height:100vh;display:grid;grid-template-columns:440px 1fr;overflow:hidden}
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;background:#f8f8fa}
+header{padding:20px 24px 16px;border-bottom:1px solid var(--line)}
+header b{display:block;font-size:15px;font-weight:600}
+header span{font-size:13px;color:var(--t3)}
+#log{flex:1;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
+.msg{opacity:0;transform:translateY(6px);transition:all .35s}
+.msg.on{opacity:1;transform:none}
+.who{font-size:12px;color:var(--t3);margin-bottom:4px}
+.user .bubble{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.call .bubble{font:12.5px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace;background:#0f1115;color:#d7dbe3;border-radius:10px;padding:12px 14px;white-space:pre-wrap;word-break:break-word}
+.call .bubble .k{color:#b9a6ff}.call .bubble .s{color:#9fd6a8}
+.res .bubble{border-left:2px solid var(--acc);padding:4px 0 4px 12px;white-space:pre-wrap;font-size:14px;color:#1f2937}
+.typing::after{content:"▍";animation:b 1s steps(1) infinite;color:var(--t3)}@keyframes b{50%{opacity:0}}
+footer{padding:12px 24px;border-top:1px solid var(--line);font-size:12px;color:var(--t3)}
+main{position:relative}
+iframe{border:0;width:100%;height:100%}
+.label{position:absolute;top:12px;right:16px;font-size:12px;background:rgba(10,10,10,.82);color:#fff;padding:5px 10px;border-radius:999px;z-index:2}
+</style>
+</head>
+<body>
+<aside>
+  <header><b>MCP kõne Academy serverisse</b><span>Kasutaja räägib Claude'iga, Claude kutsub Academy tööriista. Kõne ja vastus on päris.</span></header>
+  <div id="log"></div>
+  <footer id="foot">Server: ai-eesti-academy, Streamable HTTP</footer>
+</aside>
+<main><span class="label" id="lab">Andres, tegevjuht</span><iframe id="app" src="about:blank" title="Academy"></iframe></main>
+<script>
+try{ localStorage.setItem('academy-intro-seen','1'); localStorage.setItem('academy-side','min'); }catch(e){}
+const log = document.getElementById('log');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+async function add(cls, who, html, type){
+  const d = document.createElement('div'); d.className = 'msg ' + cls;
+  d.innerHTML = `<div class="who">${who}</div><div class="bubble"></div>`; log.appendChild(d);
+  await sleep(30); d.classList.add('on');
+  const b = d.querySelector('.bubble');
+  if(type){ b.classList.add('typing'); for(let i=1;i<=html.length;i++){ b.textContent = html.slice(0,i); log.scrollTop = log.scrollHeight; await sleep(18); } b.classList.remove('typing'); }
+  else b.innerHTML = html;
+  log.scrollTop = log.scrollHeight; return d;
+}
+function pretty(args){
+  return '<span class="k">submit_checkin</span>(\n' + Object.entries(args).map(([k,v]) => `  ${k}: <span class="s">${esc(JSON.stringify(v))}</span>`).join(',\n') + '\n)';
+}
+let rpcId = 1;
+async function call(token, name, args){
+  const r = await fetch('/mcp/' + token, { method:'POST', headers:{'content-type':'application/json', accept:'application/json, text/event-stream'},
+    body: JSON.stringify({ jsonrpc:'2.0', id: rpcId++, method:'tools/call', params:{ name, arguments: args } }) });
+  const d = await r.json(); return d.result.content[0].text;
+}
+async function scene(person, token, said, args){
+  await add('user', person, said, true);
+  await sleep(500);
+  await add('call', 'Claude kutsub tööriista', pretty(args));
+  await sleep(700);
+  const text = await call(token, 'submit_checkin', args);
+  await add('res', 'Academy vastus', esc(text));
+}
+const frame = document.getElementById('app'), lab = document.getElementById('lab');
+let n = 0;
+async function show(hash, label, target){
+  frame.src = `/?v=${++n}${hash}`; lab.textContent = label;
+  await new Promise(r => frame.onload = r); await sleep(500);
+  if(target) focusIn(target);
+}
+function focusIn(sel){ try{ const el = frame.contentDocument.querySelector(sel); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){} }
+window.runDemo = async function(){
+  await fetch('/api/reset', { method:'POST' });
+  await show('#avaleht', 'Mari, projektijuht', '#ci'); await sleep(1200);
+  await scene('Mari Tamm, projektijuht', 'demo-mari',
+    'Tegin sel nädalal pakkumuse koostajaga kolm pakkumust, igaüks säästis umbes 40 minutit. Exceli hinnavõrdlus jäi kinni.',
+    { text:'Tegin sel nädalal pakkumuse koostajaga kolm pakkumust, igaüks säästis umbes 40 minutit. Exceli hinnavõrdlus jäi kinni.', used:true, use_case:'Pakkumuse koostamine', hours_saved:2, blocker:'Exceli hinnavõrdlus jäi kinni', blocker_topic:'Excel' });
+  await sleep(3200); focusIn('#ci'); await sleep(3000);
+  await show('#tiim', 'Andres, tegevjuht', '.tbl'); await sleep(4200);
+  log.innerHTML = '';
+  await show('#lungad', 'AI Eesti meeskond'); await sleep(1000);
+  await scene('Kristel Lepp, hankespetsialist', 'demo-kristel',
+    'Tegin hankedokumentide kokkuvõtteid, säästsin kolm tundi. Riigihangete registris vormi täitmisega jäin kinni.',
+    { text:'Tegin hankedokumentide kokkuvõtteid, säästsin kolm tundi. Riigihangete registris vormi täitmisega jäin kinni.', used:true, use_case:'Hankedokumentide kokkuvõtted', hours_saved:3, blocker:'Riigihangete registri vormi täitmine', blocker_topic:'Muu' });
+  await sleep(4500);
+  window.demoDone = true;
+};
+if(location.hash === '#auto') window.runDemo(); else show('#tiim', 'Andres, tegevjuht');
+</script>
+</body>
+</html>
