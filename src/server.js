@@ -7,7 +7,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { openDb, seed, ROOT } from './db.js';
 import { createMcpServer } from './mcp.js';
 import { submitCheckin } from './checkin.js';
-import { buildState, stateVersion, userByToken, getUser, nextSteps, teamOverview, roi, contentGaps, searchMaterial, requestWorkshop, setFeatured, userStats } from './logic.js';
+import { buildState, stateVersion, userByToken, getUser, getOrg, nextSteps, teamOverview, roi, contentGaps, searchMaterial, recordGap, requestWorkshop, setFeatured, userStats } from './logic.js';
 
 export function createApp({ db = openDb(), host = process.env.HOST || '127.0.0.1', demo = process.env.ACADEMY_DEMO !== 'off', allowedHosts } = {}) {
   const app = allowedHosts ? createMcpExpressApp({ host, allowedHosts }) : createMcpExpressApp({ host });
@@ -45,6 +45,14 @@ export function createApp({ db = openDb(), host = process.env.HOST || '127.0.0.1
   app.get('/api/team', need(['manager', 'owner', 'aieesti']), (req, res) => res.json(teamOverview(db)));
   app.get('/api/roi', need(['owner', 'aieesti']), (req, res) => res.json(roi(db)));
   app.get('/api/gaps', need(['aieesti']), (req, res) => res.json(contentGaps(db)));
+  // Otsing, mis ei leidnud midagi: kasutaja annab AI Eestile teada, et sellist sisu on vaja.
+  app.post('/api/gaps', need(['member', 'manager', 'owner']), (req, res) => {
+    const topic = String(req.body?.topic || '').trim().slice(0, 120);
+    if (topic.length < 3) return res.status(400).json({ error: 'Teema on liiga lühike' });
+    if (req.user.access === 'aieesti') return res.status(400).json({ error: 'Lünki annavad teada ettevõtete töötajad' });
+    const org = getOrg(db);
+    res.status(201).json(recordGap(db, { topic, quote: String(req.body?.quote || topic).slice(0, 160), userId: req.user.id, today: org.today }));
+  });
   app.post('/api/workshops', need(['manager', 'owner']), (req, res) => res.status(201).json(requestWorkshop(db, { userId: req.user.id, topic: String(req.body?.topic || 'Töötuba'), note: req.body?.note })));
   app.post('/api/tools/:id/feature', need(['manager']), (req, res) => setFeatured(db, req.params.id, req.body?.featured !== false) ? res.json({ ok: true }) : res.status(404).json({ error: 'Sellist tööriista pole' }));
   if (demo) app.post('/api/reset', (req, res) => { seed(db); res.json({ ok: true, version: stateVersion(db) }); });

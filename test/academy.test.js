@@ -148,3 +148,17 @@ test('API: AI Eesti ei saa check-ini teha, katkine JSON annab JSON-vea', async (
     assert.equal(b.status, 400); assert.equal((await b.json()).error, 'Vigane JSON');
   } finally { srv.close(); }
 });
+
+test('API: otsing ilma tulemuseta saab anda AI Eestile teada (sisulünk)', async () => {
+  const { db, srv, base } = await start();
+  try {
+    const post = (u, topic) => fetch(`${base}/api/gaps`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user_id: u, topic, quote: topic }) });
+    const r = await post('u1', 'Jira piletite sünkroniseerimine');
+    assert.equal(r.status, 201);
+    const g = await r.json();
+    await post('u1', 'Jira piletite sünkroniseerimine');
+    assert.equal(db.prepare('SELECT people FROM gaps WHERE id = ?').get(g.id).people, 1);
+    const bad = await fetch(`${base}/api/gaps`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer demo-aieesti' }, body: JSON.stringify({ topic: 'Midagi uut' }) });
+    assert.equal(bad.status, 403);
+  } finally { srv.close(); }
+});

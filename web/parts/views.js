@@ -172,6 +172,7 @@ function viewLearn(){
   const rec = S.lessons.filter(l=>l.kind==='recording');
   return `<section class="view">
     <div class="title"><h1>Õppimine</h1><p>Iga koolituspäev on salvestatud ja jagatud peatükkideks. Kiirjuhendid lahendavad ühe kindla mure mõne minutiga.</p></div>
+    <div class="sec ask-wrap">${searchPanel()}</div>
     <div class="sec">
       <div class="sec-h"><h2>Koolituspäevad</h2></div>
       <div class="modules">${rec.map(l=>{const m=modOf(l); const seen=prog.includes(l.id); const s=SESS.find(x=>x.lesson===l.id); return `<button class="module" type="button" style="--mc:${m.c}" data-lesson="${l.id}"><span class="no">Moodul ${m.n}${s?`, ${dateEt(s.date)}`:''}</span><b>${esc(l.title)}</b><span class="meta"><span>${l.chapters.length} peatükki${l.exercises?`, ${l.exercises.length} harjutust`:''}, ${dur(l.duration_s)}</span><span>${seen?'Vaadatud':''}</span></span></button>`;}).join('')}</div>

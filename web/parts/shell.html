@@ -159,6 +159,16 @@ main::after{content:"";position:absolute;left:0;right:0;top:0;height:520px;z-ind
 @keyframes hop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 @media (max-width:760px){.hops{grid-template-columns:1fr}.hops::before{display:none}}
 @media (prefers-reduced-motion:reduce){.hop,.hops::before{animation:none}}
+.ask{display:flex;align-items:center;gap:10px;background:var(--paper);border:1px solid var(--line-2);border-radius:12px;padding:6px 6px 6px 16px;transition:border-color .15s,box-shadow .15s}
+.ask:focus-within{border-color:var(--ink);box-shadow:0 0 0 4px rgba(124,106,208,.12)}
+.ask svg{color:var(--text-3);flex:none}
+.ask input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;font-size:16px;padding:10px 0;color:var(--ink)}
+.ask input::placeholder{color:var(--text-3)}
+.ask input::-webkit-search-cancel-button{display:none}
+.ask kbd{font:500 12px/1 Inter,sans-serif;color:var(--text-3);border:1px solid var(--line-2);border-radius:5px;padding:4px 7px}
+.ask-wrap{gap:14px}
+.ask-res{display:flex;flex-direction:column;gap:12px}
+@media (max-width:560px){.ask kbd{display:none}.ask input{font-size:15px}}
 .gapnote{font-size:14px;color:var(--text-2);background:rgba(163,98,27,.08);border-radius:6px;padding:10px 12px;max-width:60ch}
 .gapnote b{color:var(--ink);font-weight:500}
 .new{display:inline-block;vertical-align:1px;margin-left:6px;font-size:11px;font-weight:500;color:#6b4fc4;background:rgba(124,106,208,.12);border-radius:4px;padding:1px 6px}
