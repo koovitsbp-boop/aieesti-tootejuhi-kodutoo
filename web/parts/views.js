@@ -120,7 +120,7 @@ function checkinPanel(){
     <div class="sec-h"><h2>Selle nädala check-in</h2></div>
     <p class="thinking"><i></i>Loen su vastust ja otsin järgmist sammu</p>`;
   return `
-    <div class="sec-h"><h2>Selle nädala check-in</h2><p>Paar lauset sellest, kuidas AI sel nädalal läks. Sellest tekib sinu ajavõit ja järgmine samm.</p></div>
+    <div class="sec-h"><h2>Selle nädala check-in</h2><p>Paar lauset sellest, kuidas sel nädalal õpitut tööl rakendasid. Sellest tekib sinu ajavõit ja järgmine samm.</p></div>
     <div class="field">
       <textarea id="ci-text" aria-label="Check-in" placeholder="Näiteks: tegin pakkumuse koostajaga kolm pakkumust, säästsin umbes kaks tundi. Hinnavõrdlus Excelis jäi kinni.">${esc(c?.raw||'')}</textarea>
       <div class="field-foot">
