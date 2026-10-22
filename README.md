@@ -14,7 +14,7 @@ See repo on Academy töötav prototüüp: veebileht, backend koos andmebaasiga j
 
 | Kes | Veebis | Claude'is (MCP tööriistad) |
 |---|---|---|
-| Tiimiliige | 90 päeva teekond, nädala check-in, järgmine video koos põhjusega, salvestused peatükkide ja slaididega | `submit_checkin`, `get_next_step`, `get_my_progress`, `find_material` |
+| Tiimiliige | 90 päeva teekond, nädala check-in, järgmine video koos põhjusega, salvestused peatükkide ja slaididega, kirjavigu taluv otsing | `submit_checkin`, `get_next_step`, `get_my_progress`, `find_material` |
 | Juht | Kes kasutab, kes on vaikne, kus tiim kinni jääb | + `get_team_overview`, `request_workshop`, `feature_tool` |
 | Omanik | Kas koolitus tasub end ära: omaosalus, tasuvuspäev, prognoos | tiimiliikme tööriistad + `get_team_overview`, `request_workshop`, `get_roi` |
 | AI Eesti | Sisulüngad kõigilt klientidelt: millest teha järgmine kiirjuhend | `get_content_gaps`, `get_roi`, `get_team_overview` |
@@ -113,7 +113,7 @@ public/        demo.html; index.template.html tekib buildiga
 test/          node:test (rollid, 401/403, check-in → juht → lünk, lünga loendus, tasuvus)
 ```
 
-**REST API:** `GET /api/state`, `GET /api/version`, `POST /api/checkins`, `GET /api/next`, `GET /api/me`, `GET /api/material?q=`, `GET /api/team`, `GET /api/roi`, `GET /api/gaps`, `POST /api/workshops`, `POST /api/tools/:id/feature`.
+**REST API:** `GET /api/state`, `GET /api/version`, `POST /api/checkins`, `GET /api/next`, `GET /api/me`, `GET /api/material?q=`, `GET /api/team`, `GET /api/roi`, `GET /api/gaps`, `POST /api/gaps` (otsing ei leidnud midagi → sisulünk), `POST /api/workshops`, `POST /api/tools/:id/feature`.
 
 Andmemudel: organisatsioon → kasutajad (roll: member, manager, owner, aieesti) → check-inid (kasutus, tunnid, takistus, soovitatud video ja peatükk, allikas `web`/`mcp`) → sisulüngad (teema, küsijate arv, ettevõtted, olek). Õppematerjalid (salvestused peatükkide, slaidide ja harjutustega ning kiirjuhendid) on sisuhalduse andmed.
 
