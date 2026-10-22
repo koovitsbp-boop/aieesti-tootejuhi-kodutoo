@@ -107,3 +107,44 @@ test('API: sama nädala uus check-in asendab eelmise', async () => {
     assert.equal(s.checkins.length, n0 + 1);
   } finally { srv.close(); }
 });
+
+test('lünk: sama inimene loeb ühe korra, asendatud check-in vabastab lünga', async () => {
+  const { db, srv, base } = await start();
+  try {
+    const post = (u, text) => fetch(`${base}/api/checkins`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user_id: u, text }) }).then(r => r.json());
+    const a = await post('u3', 'Säästsin tund aega. Jira piletite sünkroniseerimine Claudega jäi kinni, ei saa aru kuidas.');
+    assert.ok(a.gap);
+    const g = () => db.prepare('SELECT * FROM gaps WHERE topic = ?').get(a.gap);
+    assert.equal(g().people, 1);
+    await post('u3', 'Säästsin tund aega. Jira piletite sünkroniseerimine Claudega jäi kinni, ei saa aru kuidas.');
+    assert.equal(g().people, 1);
+    await post('u4', 'Säästsin kaks tundi. Jira piletite sünkroniseerimine jäi kinni, ei saa aru kuidas.');
+    assert.equal(g().people, 2);
+    await post('u3', 'Tegin kolm pakkumust, säästsin kaks tundi.');
+    assert.equal(g().people, 1);
+  } finally { srv.close(); }
+});
+
+test('lünk: erinevad Outlooki teemad ei sulandu, teadaolev lünk ei paku valet videot', async () => {
+  const { srv, base } = await start();
+  try {
+    const c = await mcp(base, 'demo-mari');
+    const r1 = await c.callTool({ name: 'submit_checkin', arguments: { text: 'Säästsin tund aega. Outlooki kalendri jagamine kolleegidega jäi kinni.', hours_saved: 1, blocker: 'Outlooki kalendri jagamine kolleegidega', blocker_topic: 'Muu' } });
+    assert.notEqual(r1.structuredContent.gap, 'Outlooki reeglid ja kaustade korrastamine');
+    const c2 = await mcp(base, 'demo-kristel');
+    const r2 = await c2.callTool({ name: 'submit_checkin', arguments: { text: 'Säästsin tund aega. Outlooki kaustad ja reeglid jäid segaseks.', hours_saved: 1, blocker: 'Outlooki kaustad ja reeglid', blocker_topic: 'Muu' } });
+    assert.equal(r2.structuredContent.material_found, false);
+    assert.equal(r2.structuredContent.gap, 'Outlooki reeglid ja kaustade korrastamine');
+    await c.close(); await c2.close();
+  } finally { srv.close(); }
+});
+
+test('API: AI Eesti ei saa check-ini teha, katkine JSON annab JSON-vea', async () => {
+  const { srv, base } = await start();
+  try {
+    const r = await fetch(`${base}/api/checkins`, { method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer demo-aieesti' }, body: JSON.stringify({ text: 'Säästsin kaks tundi pakkumustega.' }) });
+    assert.equal(r.status, 400);
+    const b = await fetch(`${base}/api/checkins`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{katki' });
+    assert.equal(b.status, 400); assert.equal((await b.json()).error, 'Vigane JSON');
+  } finally { srv.close(); }
+});

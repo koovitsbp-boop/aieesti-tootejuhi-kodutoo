@@ -737,7 +737,7 @@
    "use_case": "Hinnavõrdlus",
    "hours_saved": 6.0,
    "blocker_topic": "Andmed",
-   "blocker": "Pole kindel, mis tohib Claude'i panna"
+   "blocker": "Pole kindel, mida tohib Claude'iga jagada"
   },
   {
    "id": "ch10",
@@ -807,7 +807,7 @@
    "use_case": "Eelarve kontroll",
    "hours_saved": 1.5,
    "blocker_topic": "Andmed",
-   "blocker": "Pole kindel, mis tohib Claude'i panna"
+   "blocker": "Pole kindel, mida tohib Claude'iga jagada"
   },
   {
    "id": "ch17",

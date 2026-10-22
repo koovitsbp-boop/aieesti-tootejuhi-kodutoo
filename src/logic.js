@@ -168,10 +168,10 @@ const SYN = {
   konfidentsiaal: ['andme', 'klassifikatsioon', 'tohib'], isikuandme: ['andme', 'klassifikatsioon', 'tohib'], tohib: ['andme', 'klassifikatsioon']
 };
 const stem = w => w.length > 6 ? w.slice(0, 6) : w;
-export function tokens(text) {
+export function tokens(text, { synonyms = true } = {}) {
   const words = String(text || '').toLowerCase().normalize('NFC').split(/[^a-zäöüõšž0-9-]+/).filter(w => w.length > 2 && !STOP.has(w));
   const out = new Set();
-  for (const w of words) { out.add(stem(w)); for (const [k, v] of Object.entries(SYN)) if (w.startsWith(k)) v.forEach(s => out.add(stem(s))); }
+  for (const w of words) { out.add(stem(w)); if (synonyms) for (const [k, v] of Object.entries(SYN)) if (w.startsWith(k)) v.forEach(s => out.add(stem(s))); }
   return out;
 }
 function index(db) {
@@ -243,26 +243,44 @@ export function contentGaps(db) {
   };
 }
 const norm = s => String(s || '').toLowerCase().replace(/[^a-zäöüõšž0-9 ]/g, ' ').trim();
-/** Lisab teema lünkade nimekirja või suurendab olemasoleva lünga inimeste arvu. */
-export function recordGap(db, { topic, quote, userId, today }) {
-  const org = getOrg(db); const now = new Date().toISOString();
+/** Kas tekst vastab juba teadaolevale avatud sisulüngale? Võrdleb ainult päris sõnu (ilma sünonüümideta), et "Outlooki kalender" ja "Outlooki kaustad" ei sulanduks. */
+export function matchOpenGap(db, text) {
   const open = db.prepare("SELECT * FROM gaps WHERE status != 'done'").all();
-  const qt = tokens(topic);
+  const qt = tokens(text, { synonyms: false });
   let best = null, bestScore = 0;
   for (const g of open) {
-    if (norm(g.topic) === norm(topic)) { best = g; bestScore = 99; break; }
-    const gt = tokens(g.topic); let s = 0; qt.forEach(t => gt.has(t) && s++);
-    const ratio = s / Math.max(1, Math.min(qt.size, gt.size));
-    if (s >= 2 && ratio >= 0.5 && s > bestScore) { best = g; bestScore = s; }
+    if (norm(g.topic) === norm(text)) return g;
+    const gt = tokens(g.topic, { synonyms: false }); let n = 0; qt.forEach(t => gt.has(t) && n++);
+    const ratio = n / Math.max(1, Math.min(qt.size, gt.size));
+    if (n >= 2 && ratio >= 0.5 && n > bestScore) { best = g; bestScore = n; }
   }
+  return best;
+}
+/** Lisab teema lünkade nimekirja või liidab inimese olemasoleva lünga juurde. Iga inimene loeb ühe lünga juures üks kord. */
+export function recordGap(db, { topic, quote, userId, today }) {
+  const org = getOrg(db); const now = new Date().toISOString();
+  const best = matchOpenGap(db, topic);
   if (best) {
+    const already = db.prepare('SELECT 1 FROM gap_people WHERE gap_id = ? AND user_id = ?').get(best.id, userId);
     const companies = j(best.companies_json, []); if (!companies.includes(org.name)) companies.push(org.name);
-    db.prepare('UPDATE gaps SET people = people + 1, companies_json = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(companies), now, best.id);
+    db.prepare('UPDATE gaps SET people = people + ?, companies_json = ?, updated_at = ? WHERE id = ?').run(already ? 0 : 1, JSON.stringify(companies), now, best.id);
+    db.prepare('INSERT OR IGNORE INTO gap_people VALUES (?,?)').run(best.id, userId);
     return { id: best.id, topic: best.topic, merged: true };
   }
-  const id = 'g' + Date.now().toString(36);
+  const id = 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   db.prepare('INSERT INTO gaps VALUES (?,?,?,?,?,?,?,?,?)').run(id, String(topic).slice(0, 120), 1, JSON.stringify([org.name]), String(quote || '').slice(0, 160), today || org.today, 'new', null, now);
+  db.prepare('INSERT OR IGNORE INTO gap_people VALUES (?,?)').run(id, userId);
   return { id, topic: String(topic).slice(0, 120), merged: false };
+}
+/** Kui check-in asendatakse, võetakse inimene tema vana lünga juurest maha (ja tühjaks jäänud uus lünk kustutatakse). */
+export function releaseGap(db, gapId, userId) {
+  if (!gapId) return;
+  const still = db.prepare('SELECT 1 FROM checkins WHERE gap_id = ? AND user_id = ?').get(gapId, userId);
+  if (still) return;
+  const r = db.prepare('DELETE FROM gap_people WHERE gap_id = ? AND user_id = ?').run(gapId, userId);
+  if (!r.changes) return;
+  db.prepare('UPDATE gaps SET people = MAX(people - 1, 0) WHERE id = ?').run(gapId);
+  db.prepare("DELETE FROM gaps WHERE id = ? AND people = 0 AND status = 'new'").run(gapId);
 }
 
 export function requestWorkshop(db, { userId, topic, note }) {

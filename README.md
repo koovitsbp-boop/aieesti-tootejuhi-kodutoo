@@ -16,7 +16,7 @@ See repo on Academy töötav prototüüp: veebileht, backend koos andmebaasiga j
 |---|---|---|
 | Tiimiliige | 90 päeva teekond, nädala check-in, järgmine video koos põhjusega, salvestused peatükkide ja slaididega | `submit_checkin`, `get_next_step`, `get_my_progress`, `find_material` |
 | Juht | Kes kasutab, kes on vaikne, kus tiim kinni jääb | + `get_team_overview`, `request_workshop`, `feature_tool` |
-| Omanik | Kas koolitus tasub end ära: omaosalus, tasuvuspäev, prognoos | + `get_roi` |
+| Omanik | Kas koolitus tasub end ära: omaosalus, tasuvuspäev, prognoos | tiimiliikme tööriistad + `get_team_overview`, `request_workshop`, `get_roi` |
 | AI Eesti | Sisulüngad kõigilt klientidelt: millest teha järgmine kiirjuhend | `get_content_gaps`, `get_roi`, `get_team_overview` |
 
 Iga kasutaja näeb ainult oma rolli tööriistu. Lisaks on olemas prompt **"Nädala check-in"** (`nadala-check-in`): Claude küsib kaks küsimust ja salvestab vastused.
@@ -26,11 +26,11 @@ Iga kasutaja näeb ainult oma rolli tööriistu. Lisaks on olemas prompt **"Näd
 1. Mari ütleb Claude'ile: *"Tegin kolm pakkumust, igaüks säästis 40 minutit. Exceli hinnavõrdlus jäi kinni."*
 2. Claude täidab väljad (2 h, "Pakkumuse koostamine", takistus "Excel") ja kutsub `submit_checkin`.
 3. Server salvestab check-ini ning leiab video ja peatüki, mis takistuse lahendab, koos slaidinumbritega. Kui sobivat materjali pole, läheb teema AI Eesti sisulünkade nimekirja. Kui sama teemat on küsinud ka teised, liidetakse küsijad kokku.
-4. Andrese (juht) vaates on Mari rida märgiga "Just Claude'ist". Toomase (omanik) tasuvusarvutus liigub ja AI Eesti näeb uut lünka.
+4. Andrese (juht) vaates on Mari rida märgiga "Just Claude'ist". Toomase (omanik) vaates kasvab säästetud aja väärtus kohe, prognoos arvestab lõppenud nädalaid. Kui materjali polnud, näeb AI Eesti uut lünka.
 
 ## Käivitamine (2 minutit)
 
-Vaja on **Node.js 22.5 või uuemat** (andmebaas on Node'i sisseehitatud SQLite).
+Vaja on **Node.js 22.13 või uuemat** (andmebaas on Node'i sisseehitatud SQLite).
 
 ```bash
 npm install
@@ -38,7 +38,7 @@ npm start
 ```
 
 - Veebileht: http://localhost:3000
-- MCP demo kõrvuti vaatega: http://localhost:3000/demo
+- MCP demo kõrvuti vaatega: http://localhost:3000/demo (vajuta "Käivita demo")
 - Testid: `npm test`
 - Näidisandmed algseisu: `npm run reset`
 
@@ -96,7 +96,7 @@ Kolm teed, parimast lihtsamani:
 2. **Veebist**, kui `ANTHROPIC_API_KEY` on seatud: serveri poolel loeb teksti Claude (Messages API, mudel `ACADEMY_MODEL`, vaikimisi `claude-haiku-5-5`).
 3. **Ilma võtmeta** kasutatakse reeglipõhist lugejat. Näiteks "neli pakkumust, iga kord 40 minutit" annab 2,5 h. Demo jaoks sellest piisab.
 
-Materjali leidmiseks on märksõnaotsing salvestuste peatükkidest ja kiirjuhenditest. Kui skoor jääb alla läve, ei pakuta suvalist videot. Selle asemel tekib sisulünk, sest ausalt "seda veel pole" on parem kui vale video.
+Materjali leidmiseks on märksõnaotsing salvestuste peatükkidest ja kiirjuhenditest. Kõigepealt kontrollitakse, kas teema on juba AI Eesti sisulünkade nimekirjas. Kui on, öeldakse ausalt, et videot veel pole, ja inimene liidetakse küsijate hulka (iga inimene loeb ühe korra). Kui skoor jääb alla läve, ei pakuta suvalist videot, vaid tekib uus sisulünk. Ausalt "seda veel pole" on parem kui vale video.
 
 ## Ülesehitus
 
@@ -110,7 +110,7 @@ src/
   db.js        SQLite skeem ja näidisandmed (data/seed.json)
 web/           veebilehe lähtekood (parts/) ja build
 public/        demo.html; index.template.html tekib buildiga
-test/          node:test, 9 testi (rollid, 401/403, check-in → juht → lünk, tasuvus)
+test/          node:test (rollid, 401/403, check-in → juht → lünk, lünga loendus, tasuvus)
 ```
 
 **REST API:** `GET /api/state`, `GET /api/version`, `POST /api/checkins`, `GET /api/next`, `GET /api/me`, `GET /api/material?q=`, `GET /api/team`, `GET /api/roi`, `GET /api/gaps`, `POST /api/workshops`, `POST /api/tools/:id/feature`.
@@ -119,7 +119,7 @@ Andmemudel: organisatsioon → kasutajad (roll: member, manager, owner, aieesti)
 
 ## Piirid (ausalt)
 
-- **Autentimine on demo jaoks.** Tokenid on fikseeritud ja veebis saab rolli vahetada. Päris tootes tuleb OAuth (Claude'i custom connector toetab seda) ja `ACADEMY_DEMO=off`.
+- **Autentimine on demo jaoks.** Tokenid on fikseeritud ja veebis saab rolli vahetada. Demo-režiimis (vaikimisi) on REST API ilma tokenita avatud ja `POST /api/reset` taastab näidisandmed. MCP nõuab alati tokenit. Päris tootes tuleb OAuth (Claude'i custom connector toetab seda) ja `ACADEMY_DEMO=off`, mis sulgeb tokenita ligipääsu ja reset'i.
 - Videod on kohatäited. Slaidinumbrid ja harjutused on näidisandmed.
 - Ühe ettevõtte andmed. Mitme kliendi tugi on mudelis olemas (`org_id`), aga liides näitab üht.
 - Kasutus tuleb praegu check-inist. Enterprise klientidel saab järgmise sammuna lisada Claude'i Analytics API, et kasutus ja Skillide statistika tuleksid automaatselt.

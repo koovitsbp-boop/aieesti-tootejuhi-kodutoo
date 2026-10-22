@@ -3,7 +3,7 @@
 //  1) MCP kaudu täidab Claude (kliendi pool) väljad ise vestluse põhjal, server ainult kontrollib ja salvestab.
 //  2) Kui ANTHROPIC_API_KEY on seatud, loeb serveri poolel teksti Claude (Messages API).
 //  3) Muidu reeglipõhine lugeja (töötab ilma võtmeta, demo jaoks piisav).
-import { TOPICS, TOPIC_LESSON, getUser, getOrg, lessonMap, searchMaterial, describeMaterial, recordGap, dayInfo, moduleOf } from './logic.js';
+import { TOPICS, TOPIC_LESSON, getUser, getOrg, lessonMap, searchMaterial, describeMaterial, recordGap, releaseGap, matchOpenGap, dayInfo, moduleOf } from './logic.js';
 
 const ANSWERS = {
   Excel: "Lase Claude'il kõigepealt kolm pakkumust ühte ühtsesse tabelisse tõsta ja alles siis võrrelda. Kui valemid lähevad sassi, palu tal näidata iga valemit eraldi ja kontrolli üht rida käsitsi.",
@@ -28,7 +28,7 @@ export function ruleParse(text) {
   if (!h && !none) h = 1;
   if (none) h = 0;
   const hours = Math.round(h * 2) / 2;
-  if (/outlook|kaust|reegl/.test(t) && /ei saa|ei oska|aru|kuidas|kinni/.test(t)) return {
+  if (/outlook/.test(t) && /kaust|reegl|sorteer/.test(t) && /ei saa|ei oska|aru|kuidas|kinni|segane/.test(t)) return {
     used: !none, use_case: 'E-kirjade kokkuvõtted', hours_saved: hours, blocker: 'Outlooki reeglid ja kaustad jäid segaseks', blocker_topic: 'Muu',
     answer: 'Claude ise Outlooki reegleid ei loo, aga oskab need sulle välja kirjutada. Kirjelda talle, millised kirjad kuhu peavad minema, ja palu samm-sammult juhend Outlooki reeglite seadistamiseks.',
     gap: 'Outlooki reeglid ja kaustade korrastamine', search: null };
@@ -74,7 +74,11 @@ function materialList(L) {
  */
 export async function submitCheckin(db, { userId, text, source = 'web', fields = {} }) {
   const user = getUser(db, userId); if (!user) throw new Error('Tundmatu kasutaja');
-  const clean = String(text || '').trim();
+  if (user.access === 'aieesti') throw new Error('Check-ini teevad ettevõtte töötajad, mitte AI Eesti meeskond.');
+  const clean = typeof text === 'string' ? text.trim() : '';
+  fields = Object.fromEntries(Object.entries(fields || {}).map(([k, v]) => [k, ['used', 'hours_saved'].includes(k) || v == null ? v : String(v).slice(0, 200)]));
+  if (fields.hours_saved != null) fields.hours_saved = Number(fields.hours_saved);
+  if (fields.used != null) fields.used = fields.used === true || fields.used === 'true';
   if (clean.length < 8) throw new Error('Kirjuta paar lauset: mida tegid ja kui palju aega see säästis.');
   const L = lessonMap(db); const org = getOrg(db);
   let p = await claudeParse(clean, { user, materials: materialList(L) });
@@ -92,9 +96,11 @@ export async function submitCheckin(db, { userId, text, source = 'web', fields =
     "Kirjelda Claude'ile täpselt, mis juhtus ja mis oli oodatud tulemus, ning palu tal enne vastamist küsida sinult kaks täpsustavat küsimust. Kui see ei aita, tõstab Academy teema AI Eestile.";
 
   // Materjal: API vastus, siis teemakaart, siis märksõnaotsing takistuse tekstist. Kui midagi ei sobi, läheb teema lünkadesse.
-  let lessonId = L[p.lesson_id] ? p.lesson_id : null;
+  // Teadaolev sisulünk (AI Eesti juba teab, et selle kohta videot pole): ära paku lähedast, aga valet videot.
+  if (p.blocker && !p.gap && !fields.gap) { const known = matchOpenGap(db, `${p.blocker} ${clean}`); if (known) p.gap = known.topic; }
+  let lessonId = L[p.lesson_id] && !p.gap ? p.lesson_id : null;
   let chapter = lessonId && Number.isInteger(+p.chapter) && L[lessonId].chapters?.[+p.chapter] ? +p.chapter : null;
-  if (!lessonId && p.blocker_topic && REF[p.blocker_topic] && !fields.blocker) [lessonId, chapter] = REF[p.blocker_topic];
+  if (!lessonId && !p.gap && p.blocker_topic && REF[p.blocker_topic] && !fields.blocker) [lessonId, chapter] = REF[p.blocker_topic];
   if (!lessonId && p.blocker && !p.gap) {
     const hit = searchMaterial(db, `${p.blocker} ${fields.blocker_topic || ''}`, 1)[0];
     if (hit && hit.score >= 3) { lessonId = hit.lesson_id; chapter = hit.chapter; }
@@ -102,16 +108,17 @@ export async function submitCheckin(db, { userId, text, source = 'web', fields =
     else p.gap = fields.gap || p.blocker;
   }
   if (!p.blocker && !lessonId) [lessonId, chapter] = ['l2', 2];
+  if (p.used === false) p.use_case = null;
   if (fields.gap) { p.gap = fields.gap; lessonId = null; chapter = null; }
   const materialFound = !!lessonId && !p.gap;
 
+  // Üks kasutaja-poolne check-in nädalas: uus asendab sama nädala eelmise (veebis nupp "Muuda").
+  const { week, dayOf } = dayInfo(org);
+  const mine = db.prepare("SELECT id, created_at, gap_id FROM checkins WHERE user_id = ? AND source != 'seed'").all(userId);
+  mine.filter(c => Math.floor((dayOf(c.created_at) - 1) / 7) + 1 === week).forEach(c => { db.prepare('DELETE FROM checkins WHERE id = ?').run(c.id); releaseGap(db, c.gap_id, userId); });
+
   let gap = null;
   if (!materialFound && p.gap) gap = recordGap(db, { topic: p.gap, quote: clean.slice(0, 140), userId, today: org.today });
-
-  // Üks kasutaja-poolne check-in nädalas: uus asendab sama nädala eelmise (veebis nupp "Muuda").
-  const { week } = dayInfo(org); const { dayOf } = dayInfo(org);
-  const mine = db.prepare("SELECT id, created_at FROM checkins WHERE user_id = ? AND source != 'seed'").all(userId);
-  mine.filter(c => Math.floor((dayOf(c.created_at) - 1) / 7) + 1 === week).forEach(c => db.prepare('DELETE FROM checkins WHERE id = ?').run(c.id));
 
   const id = 'ci' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
   const now = new Date().toISOString();

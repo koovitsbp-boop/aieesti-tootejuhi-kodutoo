@@ -12,6 +12,10 @@ aside{border-right:1px solid var(--line);display:flex;flex-direction:column;back
 header{padding:20px 24px 16px;border-bottom:1px solid var(--line)}
 header b{display:block;font-size:15px;font-weight:600}
 header span{font-size:13px;color:var(--t3)}
+#run{margin-top:12px;font:500 14px/1 Inter,system-ui,sans-serif;background:var(--ink);color:#fff;border:0;border-radius:8px;padding:10px 16px;cursor:pointer}
+#run:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+#run[hidden]{display:none}
+.empty{color:var(--t3);font-size:14px}
 #log{flex:1;overflow:auto;padding:20px 24px;display:flex;flex-direction:column;gap:14px}
 .msg{opacity:0;transform:translateY(6px);transition:all .35s}
 .msg.on{opacity:1;transform:none}
@@ -29,8 +33,8 @@ iframe{border:0;width:100%;height:100%}
 </head>
 <body>
 <aside>
-  <header><b>MCP kõne Academy serverisse</b><span>Kasutaja räägib Claude'iga, Claude kutsub Academy tööriista. Kõne ja vastus on päris.</span></header>
-  <div id="log"></div>
+  <header><b>MCP kõne Academy serverisse</b><span>Kasutaja räägib Claude'iga, Claude kutsub Academy tööriista. Kõne ja vastus on päris.</span><br><button id="run" type="button">Käivita demo</button></header>
+  <div id="log"><p class="empty">Demo taastab näidisandmed ja teeb kaks check-ini: Mari Claude'ist ja Kristel, kelle teema kohta videot pole. Paremal näed, kuidas Academy uueneb.</p></div>
   <footer id="foot">Server: ai-eesti-academy, Streamable HTTP</footer>
 </aside>
 <main><span class="label" id="lab">Andres, tegevjuht</span><iframe id="app" src="about:blank" title="Academy"></iframe></main>
@@ -74,6 +78,7 @@ async function show(hash, label, target){
 }
 function focusIn(sel){ try{ const el = frame.contentDocument.querySelector(sel); if(el) el.scrollIntoView({behavior:'smooth', block:'start'}); }catch(e){} }
 window.runDemo = async function(){
+  const btn = document.getElementById('run'); btn.hidden = true; log.innerHTML = ''; window.demoDone = false;
   await fetch('/api/reset', { method:'POST' });
   await show('#avaleht', 'Mari, projektijuht', '#ci'); await sleep(1200);
   await scene('Mari Tamm, projektijuht', 'demo-mari',
@@ -87,8 +92,9 @@ window.runDemo = async function(){
     'Tegin hankedokumentide kokkuvõtteid, säästsin kolm tundi. Riigihangete registris vormi täitmisega jäin kinni.',
     { text:'Tegin hankedokumentide kokkuvõtteid, säästsin kolm tundi. Riigihangete registris vormi täitmisega jäin kinni.', used:true, use_case:'Hankedokumentide kokkuvõtted', hours_saved:3, blocker:'Riigihangete registri vormi täitmine', blocker_topic:'Muu' });
   await sleep(4500);
-  window.demoDone = true;
+  window.demoDone = true; btn.textContent = 'Käivita uuesti'; btn.hidden = false;
 };
+document.getElementById('run').addEventListener('click', () => window.runDemo());
 if(location.hash === '#auto') window.runDemo(); else show('#tiim', 'Andres, tegevjuht');
 </script>
 </body>

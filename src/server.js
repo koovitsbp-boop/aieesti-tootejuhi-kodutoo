@@ -66,6 +66,12 @@ export function createApp({ db = openDb(), host = process.env.HOST || '127.0.0.1
   app.get('/mcp', notAllowed); app.get('/mcp/:token', notAllowed);
   app.delete('/mcp', notAllowed); app.delete('/mcp/:token', notAllowed);
 
+  // Vigased päringud (nt katkine JSON) saavad lühikese JSON-vastuse, mitte HTML-i koos failiteedega.
+  app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    res.status(err.status || err.statusCode || 500).json({ error: err.type === 'entity.parse.failed' ? 'Vigane JSON' : 'Serveri viga' });
+  });
+
   /* ---------- veebileht ---------- */
   const tplPath = join(ROOT, 'public', 'index.template.html');
   app.get(['/', '/index.html'], (req, res) => {

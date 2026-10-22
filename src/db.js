@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS gaps (
   id TEXT PRIMARY KEY, topic TEXT NOT NULL, people INTEGER DEFAULT 1, companies_json TEXT,
   quote TEXT, first_seen TEXT, status TEXT DEFAULT 'new', lesson_id TEXT, updated_at TEXT
 );
+CREATE TABLE IF NOT EXISTS gap_people (gap_id TEXT, user_id TEXT, PRIMARY KEY (gap_id, user_id));
 CREATE TABLE IF NOT EXISTS missions (week INTEGER PRIMARY KEY, title TEXT, lesson_ref TEXT, chapter INTEGER, exercise INTEGER);
 CREATE TABLE IF NOT EXISTS progress (user_id TEXT, lesson_id TEXT, PRIMARY KEY (user_id, lesson_id));
 CREATE TABLE IF NOT EXISTS workshop_requests (
@@ -70,7 +71,7 @@ export function seed(db, seedData = JSON.parse(readFileSync(SEED_PATH, 'utf8')))
   const s = seedData;
   db.exec('BEGIN');
   try {
-    for (const t of ['organizations','users','tokens','courses','lessons','tools','checkins','gaps','missions','progress','workshop_requests','meta']) db.exec(`DELETE FROM ${t}`);
+    for (const t of ['organizations','users','tokens','courses','lessons','tools','checkins','gaps','gap_people','missions','progress','workshop_requests','meta']) db.exec(`DELETE FROM ${t}`);
     const o = s.organization;
     db.prepare(`INSERT INTO organizations VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`).run(
       o.id, o.name, o.program, o.participants, o.program_price_eur, o.subsidy_eur, o.hourly_cost_eur,

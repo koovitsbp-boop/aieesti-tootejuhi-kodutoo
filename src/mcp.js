@@ -6,7 +6,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { submitCheckin } from './checkin.js';
-import { nextSteps, searchMaterial, userStats, teamOverview, roi, contentGaps, requestWorkshop, setFeatured, getOrg, dayInfo, TOPICS } from './logic.js';
+import { nextSteps, searchMaterial, matchOpenGap, userStats, teamOverview, roi, contentGaps, requestWorkshop, setFeatured, getOrg, dayInfo, TOPICS } from './logic.js';
 
 const eur = n => Math.round(n).toLocaleString('et-EE') + ' €';
 const h = n => (Math.round(n * 10) / 10).toLocaleString('et-EE') + ' h';
@@ -89,6 +89,9 @@ Check-in jõuab kohe ka juhi, omaniku ja AI Eesti vaatesse.`,
     annotations: { readOnlyHint: true, openWorldHint: false }
   }, async ({ query }) => {
     const hits = searchMaterial(db, query, 3);
+    const known = matchOpenGap(db, query);
+    if (known) return ok(`Teema "${known.topic}" on AI Eesti sisulünkade nimekirjas: täpset videot selle kohta veel pole (küsinud ${known.people} inimest).` +
+      (hits.length ? '\nLähimad seotud materjalid:\n' + hits.map((m, i) => `${i + 1}. ${m.title} (${m.where}${m.slides ? `, slaidid ${m.slides}` : ''})`).join('\n') : ''), { query, known_gap: known.topic, results: hits });
     if (!hits.length) return ok(`Teemal "${query}" materjali ei leitud. Kui see on päris vajadus, tee check-in ja teema läheb AI Eestile.`, { query, results: [] });
     return ok(hits.map((m, i) => `${i + 1}. ${m.title} (${m.where}${m.slides ? `, slaidid ${m.slides}` : ''})`).join('\n'), { query, results: hits });
   });
@@ -101,7 +104,7 @@ Check-in jõuab kohe ka juhi, omaniku ja AI Eesti vaatesse.`,
       annotations: { readOnlyHint: true, openWorldHint: false }
     }, async () => {
       const t = teamOverview(db);
-      const text = [`${t.organization}, päev ${t.day} 90-st. Kasutasid viimasel 10 päeval: ${t.active_last_10_days}/${t.people_total}. Säästetud kokku ${h(t.hours_saved)}. Vaikseid: ${t.quiet}.`,
+      const text = [`${t.organization}, päev ${t.day} 90-st. Kasutasid AI-d viimasel nädalal: ${t.active_last_10_days}/${t.people_total}. Säästetud kokku ${h(t.hours_saved)}. Vaikseid: ${t.quiet}.`,
         t.blockers.length ? 'Takistused: ' + t.blockers.map(b => `${b.label} (${b.people})`).join(', ') + '.' : null,
         t.suggestion,
         'Inimesed:', ...t.people.map(p => `- ${p.name}, ${p.role_title}: ${p.status_label}, ${h(p.hours_saved)}${p.last_blocker ? `, kinni: ${p.last_blocker}` : ''}`)].filter(Boolean).join('\n');
@@ -138,7 +141,7 @@ Check-in jõuab kohe ka juhi, omaniku ja AI Eesti vaatesse.`,
         `Päev ${r.day}: säästetud ${h(r.hours_saved)}, väärtus ${eur(r.value_today_eur)} (tunnihind ${r.hourly_cost_eur} €).`,
         r.paid_back ? 'Koolitus on end juba ära tasunud.' : `Selle tempoga tasub end ära umbes ${r.payback_day}. päeval.`,
         `Prognoos 90 päeva lõpuks: ${eur(r.projected_value_day90_eur)}, ${r.projected_multiple.toLocaleString('et-EE')} korda omaosalus.`,
-        `Kasutasid viimasel 10 päeval: ${r.active_last_10_days}/${r.people}.`].join('\n');
+        `Kasutasid AI-d viimasel nädalal: ${r.active_last_10_days}/${r.people}.`].join('\n');
       return ok(text, r);
     });
   }
